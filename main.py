@@ -1,44 +1,57 @@
-### Import the packages
-
-from flask import Flask, render_template, request
+import streamlit as st
 import numpy as np
 from PIL import Image
-from keras.models import load_model
+import tensorflow as tf
 
-### Load our model
+# -----------------------------
+# Page config
+# -----------------------------
+st.set_page_config(page_title="Down Syndrome Detection", layout="centered")
 
-app = Flask(__name__) 
-model = load_model('model.h5')
+st.title("🧬 Down Syndrome Detection")
+st.write("Upload a facial image to get prediction")
 
-### Connect to our website
-@app.route('/')
-def home():
-    return render_template('index.html')
+# -----------------------------
+# Load model (cached)
+# -----------------------------
+@st.cache_resource
+def load_model():
+    model = tf.keras.models.load_model("model.h5")
+    return model
 
-@app.route('/predict', methods = ['POST'])
-def predict():
-    file = request.files['file']
-    file.save('input_images/input.jpg')
-    
-    
-    image_path = "input_images/input.jpg"
-    height, width = 64,64 
-    image = Image.open(image_path)
-    image = image.resize((width,height))
+model = load_model()
 
-    image_array = np.asarray(image)
-    image_array = image_array/255.0
-    
-    image_array = image_array.reshape(1,width,height,3)
-    
-    prediction = model.predict(image_array)
-    output = ""
-    if prediction[0][0]>=0.5:
-        output = 'Healthy'
-    else: 
-        output = 'Down Syndrome'
-    
-    return render_template('index.html', prediction_text = output)
+# -----------------------------
+# Image uploader
+# -----------------------------
+uploaded_file = st.file_uploader(
+    "Choose an image...",
+    type=["jpg", "jpeg", "png"]
+)
 
-if __name__ == "__main__":
-    app.run(debug = False)
+if uploaded_file is not None:
+    image = Image.open(uploaded_file)
+    st.image(image, caption="Uploaded Image", use_container_width=True)
+
+    # -----------------------------
+    # Preprocess image
+    # -----------------------------
+    height, width = 64, 64
+    image = image.resize((width, height))
+
+    image_array = np.asarray(image) / 255.0
+    image_array = image_array.reshape(1, width, height, 3)
+
+    # -----------------------------
+    # Prediction
+    # -----------------------------
+    if st.button("Predict"):
+        prediction = model.predict(image_array)
+
+        if prediction[0][0] >= 0.5:
+            result = "✅ Healthy"
+        else:
+            result = "⚠️ Down Syndrome"
+
+        st.subheader("Prediction:")
+        st.success(result)
